@@ -407,8 +407,9 @@
     }
 
     .msg-row.user .msg-bubble {
-      background: #2563eb;
-      color: #ffffff;
+      background: linear-gradient(135deg, #c9a84c, #b38f36);
+      color: #120e06;
+      font-weight: 500;
       border-top-right-radius: 4px;
     }
 
@@ -451,9 +452,34 @@
       margin-right: 4px;
     }
 
-    /* Recommended follow-up questions */
-    .suggested-followups {
-      margin-top: 10px;
+    /* Recommended follow-up questions section */
+    .followup-container {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      width: 100%;
+    }
+
+    .followup-header {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #9e9080;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-left: 2px;
+    }
+
+    .followup-header svg {
+      width: 12px;
+      height: 12px;
+      fill: #c9a84c;
+    }
+
+    .followup-list {
       display: flex;
       flex-direction: column;
       gap: 6px;
@@ -477,24 +503,13 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      width: 100%;
     }
 
     .followup-chip:hover {
       background: #252018;
       border-color: #c9a84c;
       color: #f3e5be;
-    }
-
-    .followup-spark {
-      color: #c9a84c;
-      font-size: 13px;
-      flex-shrink: 0;
-    }
-
-    .followup-text {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     /* 3 Floating Dots Loader */
@@ -802,26 +817,35 @@
     inner.appendChild(bubble);
     inner.appendChild(timeEl);
 
-    // Recommended 1-line questions below AI message
+    // Follow-up queries section (2 questions with heading)
     if (role === 'bot') {
       const followups = (suggestedQuestions && suggestedQuestions.length) ? suggestedQuestions : [
         "What are the payment plans and expected handover timeline?",
-        "Can you detail the luxury amenities and architectural highlights?",
-        "What is the projected rental yield or capital appreciation?"
+        "Can you detail the luxury amenities and architectural highlights?"
       ];
 
-      const recWrap = document.createElement('div');
-      recWrap.className = 'suggested-followups';
+      const container = document.createElement('div');
+      container.className = 'followup-container';
 
-      followups.slice(0, 3).forEach(q => {
+      const header = document.createElement('div');
+      header.className = 'followup-header';
+      header.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.5h-2v-2h2zm0-4.5h-2V7h2z"/></svg> Suggested Queries`;
+      container.appendChild(header);
+
+      const listDiv = document.createElement('div');
+      listDiv.className = 'followup-list';
+
+      followups.slice(0, 2).forEach(q => {
         const btn = document.createElement('button');
         btn.className = 'followup-chip';
         btn.type = 'button';
-        btn.innerHTML = `<span class="followup-spark">💡</span><span class="followup-text">${q}</span>`;
+        btn.textContent = q;
         btn.onclick = () => submitSuggestion(q);
-        recWrap.appendChild(btn);
+        listDiv.appendChild(btn);
       });
-      inner.appendChild(recWrap);
+
+      container.appendChild(listDiv);
+      inner.appendChild(container);
     }
 
     if (role === 'bot') {
