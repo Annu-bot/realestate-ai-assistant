@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RealEstate AI Assistant</title>
+  <title>DarGlobal &amp; Wasalt | PropTech AI Advisor</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏢</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -206,11 +206,30 @@
       justify-content: space-between;
     }
 
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .topbar-title {
       font-family: var(--font-sans);
       font-size: 13px;
       font-weight: 500;
       color: var(--text-on-dark);
+    }
+
+    .topbar-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 10.5px;
+      font-weight: 500;
+      color: #c9a84c;
+      background: rgba(201, 168, 76, 0.1);
+      border: 1px solid rgba(201, 168, 76, 0.25);
+      border-radius: 12px;
+      padding: 2px 9px;
+      letter-spacing: 0.2px;
     }
 
     @keyframes pulse {
@@ -631,15 +650,15 @@
 <aside>
   <div class="sidebar-top">
     <div class="brand">
-      <div class="brand-mark">
-        <!-- home / building icon -->
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+      <div class="brand-mark" style="background: linear-gradient(135deg, #2a2215, #1a160e); border: 1px solid #c9a84c;">
+        <!-- geometric luxury crest -->
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="#c9a84c">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
         </svg>
       </div>
       <div class="brand-text">
-        <h1>RealEstate AI</h1>
-        <span>AI Property Search</span>
+        <h1>DarGlobal AI</h1>
+        <span>PropTech Advisor</span>
       </div>
     </div>
     <button class="new-chat-btn" onclick="startNewChat()">
@@ -662,7 +681,10 @@
 <!-- ── Main ──────────────────────────────────────── -->
 <main>
   <div class="topbar">
-    <span class="topbar-title">Property Assistant</span>
+    <div class="topbar-left">
+      <span class="topbar-title">DarGlobal &amp; Wasalt AI Advisor</span>
+      <span class="topbar-badge">● Live Knowledge Base</span>
+    </div>
     <button class="topbar-clear" onclick="clearChat()">Clear chat</button>
   </div>
 
@@ -680,8 +702,8 @@
         </div>
       </div>
 
-      <h2>Find your perfect property</h2>
-      <p>Ask me about luxury villas, project specifications, pricing, locations, or investment opportunities across the region.</p>
+      <h2>DarGlobal &amp; Wasalt Intelligence</h2>
+      <p>Explore DarGlobal luxury residences and Wasalt property listings &amp; auctions.</p>
 
       <div class="suggestions" id="suggestions">
 
