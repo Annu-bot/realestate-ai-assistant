@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import TruncatedSVD
 
 logger = logging.getLogger(__name__)
 

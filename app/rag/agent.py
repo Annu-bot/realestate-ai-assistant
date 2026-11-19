@@ -136,8 +136,16 @@ def _clean_model_output(text: str) -> str:
     return cleaned.strip()
 
 
+_CACHED_KEYS: list[str] = []
+_CLIENT_CACHE: dict[str, Any] = {}
+
+
 def _get_api_keys() -> list[str]:
     """Retrieve list of API keys for pool rotation from environment or .env."""
+    global _CACHED_KEYS
+    if _CACHED_KEYS:
+        return _CACHED_KEYS
+
     raw = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not raw:
         env_file = Path(__file__).resolve().parents[2] / ".env"
@@ -149,20 +157,16 @@ def _get_api_keys() -> list[str]:
                     if raw:
                         os.environ["OPENROUTER_API_KEY"] = raw
                         break
-    return [k.strip() for k in raw.split(",") if k.strip()]
+    _CACHED_KEYS = [k.strip() for k in raw.split(",") if k.strip()]
+    return _CACHED_KEYS
 
 
-def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
-    """Call OpenRouter with multi-key pool rotation and multi-model failover."""
+def _get_openai_client(api_key: str):
+    """Reuse persistent OpenAI client with keep-alive HTTP connection pool."""
     from openai import OpenAI
 
-    keys = _get_api_keys()
-    if not keys:
-        raise ValueError("OPENROUTER_API_KEY not configured in .env")
-
-    last_error = None
-    for key_idx, api_key in enumerate(keys):
-        client = OpenAI(
+    if api_key not in _CLIENT_CACHE:
+        _CLIENT_CACHE[api_key] = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key,
             timeout=7.0,
@@ -172,6 +176,18 @@ def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
                 "X-Title": "PropTech AI Advisor",
             },
         )
+    return _CLIENT_CACHE[api_key]
+
+
+def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
+    """Call OpenRouter with multi-key pool rotation and multi-model failover."""
+    keys = _get_api_keys()
+    if not keys:
+        raise ValueError("OPENROUTER_API_KEY not configured in .env")
+
+    last_error = None
+    for key_idx, api_key in enumerate(keys):
+        client = _get_openai_client(api_key)
 
         for model in _FREE_MODELS:
             try:
@@ -180,7 +196,7 @@ def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
                     model=model,
                     messages=messages,
                     temperature=temperature,
-                    max_tokens=800,
+                    max_tokens=400,
                 )
                 msg = response.choices[0].message
                 content = msg.content or getattr(msg, "text", None) or ""
