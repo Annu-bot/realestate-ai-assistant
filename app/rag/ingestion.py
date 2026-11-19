@@ -282,6 +282,15 @@ def ingest(
         print("ingestion: no chunks found – nothing to ingest.")
         return
 
+    # Clear previous chunks for clean idempotent ingestion
+    if hasattr(vector_store, "clear"):
+        vector_store.clear()
+
+    # Pre-fit embedder across full corpus vocabulary
+    if hasattr(embedder, "fit_corpus"):
+        all_texts = [c["text"] for c in chunks]
+        embedder.fit_corpus(all_texts)
+
     print(f"ingestion: {total} chunks to embed and store (batch_size={batch_size}).")
 
     for batch_start in range(0, total, batch_size):

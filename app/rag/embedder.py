@@ -3,20 +3,27 @@ embedder.py
 -----------
 Provides the Embedder class for generating text embeddings.
 
-Primary backend: OpenRouter API (text-embedding-3-small, OpenAI-compatible).
-Fallback backend: sklearn TfidfVectorizer + TruncatedSVD (384-dim dense vectors).
-Works without an API key during local testing.
+Primary backend: Embedded local TF-IDF + TruncatedSVD pipeline (384-dim dense vectors).
+Fitted across the entire property corpus and persisted to disk for zero-latency,
+100% deterministic, offline search. Completely free with zero external API dependencies.
+
+Optional backend: OpenRouter / OpenAI API embeddings when USE_OPENROUTER_EMBEDDINGS=1.
 """
 
-import os
 import logging
-from typing import List
+import os
+import pickle
+from pathlib import Path
+from typing import List, Optional
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
 EMBED_DIM = 384
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MODEL_DIR = PROJECT_ROOT / "data" / "processed" / "vector_index"
+MODEL_PATH = MODEL_DIR / "tfidf_model.pkl"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 EMBED_MODEL = "text-embedding-3-small"
 
@@ -24,27 +31,90 @@ EMBED_MODEL = "text-embedding-3-small"
 class Embedder:
     """Generate dense vector embeddings for text chunks.
 
-    Tries OpenRouter (OpenAI-compatible) first; falls back to a local
-    TF-IDF + SVD pipeline if the API is unavailable or the key is missing.
+    Uses an embedded scikit-learn TF-IDF + TruncatedSVD pipeline persisted to disk,
+    guaranteeing that runtime queries and indexed property documents exist in the exact
+    same mathematical vector space with zero API cost and zero rate limits.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, model_path: Optional[Path] = None) -> None:
+        self.model_path = model_path or MODEL_PATH
         self._api_key: str = os.environ.get("OPENROUTER_API_KEY", "")
+        self._use_api_embeddings = os.environ.get("USE_OPENROUTER_EMBEDDINGS", "0") == "1"
         self._openai_client = None
-        self._tfidf = None          # sklearn TfidfVectorizer
-        self._svd = None            # sklearn TruncatedSVD
+
+        self._tfidf = None
+        self._svd = None
         self._tfidf_fitted = False
 
-        if self._api_key:
+        # Load persisted model if present on disk
+        self._load_model()
+
+        if self._use_api_embeddings and self._api_key:
             try:
                 from openai import OpenAI  # type: ignore
                 self._openai_client = OpenAI(
                     api_key=self._api_key,
                     base_url=OPENROUTER_BASE_URL,
                 )
-                logger.info("Embedder: OpenRouter client initialised.")
+                logger.info("Embedder: OpenRouter client initialized for embeddings.")
             except Exception as exc:
-                logger.warning("Embedder: failed to initialise OpenAI client: %s", exc)
+                logger.warning("Embedder: failed to initialize OpenAI client: %s", exc)
+
+    def _load_model(self) -> bool:
+        """Load persisted TF-IDF and SVD models from disk."""
+        if self.model_path.exists():
+            try:
+                with open(self.model_path, "rb") as f:
+                    data = pickle.load(f)
+                    self._tfidf = data.get("tfidf")
+                    self._svd = data.get("svd")
+                    self._tfidf_fitted = True
+                    logger.info("Embedder: Loaded fitted embedding model from %s", self.model_path)
+                    return True
+            except Exception as exc:
+                logger.warning("Embedder: Could not load saved model (%s), will re-fit.", exc)
+        return False
+
+    def _save_model(self) -> None:
+        """Persist TF-IDF and SVD models to disk."""
+        try:
+            os.makedirs(self.model_path.parent, exist_ok=True)
+            with open(self.model_path, "wb") as f:
+                pickle.dump({"tfidf": self._tfidf, "svd": self._svd}, f)
+            logger.info("Embedder: Persisted embedding model to %s", self.model_path)
+        except Exception as exc:
+            logger.warning("Embedder: Failed to save model: %s", exc)
+
+    def fit_corpus(self, texts: List[str]) -> None:
+        """Fit TF-IDF and SVD across the entire corpus for optimal vocabulary coverage."""
+        from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore
+        from sklearn.decomposition import TruncatedSVD  # type: ignore
+
+        if not texts:
+            return
+
+        sanitized = [t if t.strip() else " " for t in texts]
+
+        self._tfidf = TfidfVectorizer(
+            max_features=12000,
+            ngram_range=(1, 2),
+            sublinear_tf=True,
+            strip_accents="unicode",
+        )
+        tfidf_matrix = self._tfidf.fit_transform(sanitized)
+
+        n_comp = min(EMBED_DIM, max(2, tfidf_matrix.shape[1] - 1))
+        self._svd = TruncatedSVD(n_components=n_comp, random_state=42)
+        self._svd.fit(tfidf_matrix)
+
+        self._tfidf_fitted = True
+        self._save_model()
+        logger.info(
+            "Embedder: Fitted corpus (%d documents, %d features, %d components).",
+            len(texts),
+            tfidf_matrix.shape[1],
+            n_comp,
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -62,19 +132,18 @@ class Embedder:
         if not texts:
             return []
 
-        # Sanitise: replace empty strings so the API doesn't error
-        sanitised = [t if t.strip() else " " for t in texts]
+        sanitized = [t if t.strip() else " " for t in texts]
 
-        if self._openai_client:
+        if self._use_api_embeddings and self._openai_client:
             try:
-                return self._embed_openrouter(sanitised)
+                return self._embed_openrouter(sanitized)
             except Exception as exc:
                 logger.warning(
-                    "Embedder: OpenRouter embedding failed (%s). Falling back to TF-IDF SVD.",
+                    "Embedder: OpenRouter embedding failed (%s). Falling back to local TF-IDF SVD.",
                     exc,
                 )
 
-        return self._embed_tfidf(sanitised)
+        return self._embed_tfidf(sanitized)
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -82,7 +151,6 @@ class Embedder:
 
     def _embed_openrouter(self, texts: List[str]) -> List[List[float]]:
         """Call OpenRouter embedding endpoint (OpenAI-compatible)."""
-        # Batch in chunks of 100 to stay within typical API limits
         results: List[List[float]] = []
         batch_size = 100
         for i in range(0, len(texts), batch_size):
@@ -91,47 +159,38 @@ class Embedder:
                 model=EMBED_MODEL,
                 input=batch,
             )
-            # Sort by index to preserve order
             sorted_data = sorted(response.data, key=lambda d: d.index)
             results.extend([d.embedding for d in sorted_data])
 
-        # If the model returns vectors of a different dimensionality, pad/trim
         results = [self._resize_vector(v, EMBED_DIM) for v in results]
         return results
 
     def _embed_tfidf(self, texts: List[str]) -> List[List[float]]:
-        """Local TF-IDF + TruncatedSVD fallback (always 384-dim output)."""
+        """Local TF-IDF + TruncatedSVD transformation (always 384-dim output)."""
         from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore
         from sklearn.decomposition import TruncatedSVD  # type: ignore
-        from sklearn.pipeline import Pipeline  # type: ignore
 
         if not self._tfidf_fitted:
-            self._tfidf = TfidfVectorizer(
-                max_features=8192,
-                sublinear_tf=True,
-                strip_accents="unicode",
-            )
-            self._svd = TruncatedSVD(n_components=EMBED_DIM, random_state=42)
-            # Fit on the current batch (best effort; more docs = better)
-            tfidf_matrix = self._tfidf.fit_transform(texts)
-            # SVD needs at least EMBED_DIM+1 columns; pad if necessary
-            if tfidf_matrix.shape[1] < EMBED_DIM + 1:
-                n_comp = max(1, tfidf_matrix.shape[1] - 1)
-                self._svd = TruncatedSVD(n_components=n_comp, random_state=42)
-            embeddings = self._svd.fit_transform(tfidf_matrix)
-            self._tfidf_fitted = True
-        else:
+            # Try loading from disk one more time
+            if not self._load_model():
+                self.fit_corpus(texts)
+
+        try:
+            tfidf_matrix = self._tfidf.transform(texts)
+            embeddings = self._svd.transform(tfidf_matrix)
+        except Exception:
+            # Emergency fallback fit
+            self.fit_corpus(texts)
             tfidf_matrix = self._tfidf.transform(texts)
             embeddings = self._svd.transform(tfidf_matrix)
 
-        # Normalise to unit length and pad/trim to EMBED_DIM
         result = []
         for vec in embeddings:
-            vec = self._resize_vector(vec.tolist(), EMBED_DIM)
-            norm = float(np.linalg.norm(vec))
+            v_list = self._resize_vector(vec.tolist(), EMBED_DIM)
+            norm = float(np.linalg.norm(v_list))
             if norm > 0:
-                vec = [v / norm for v in vec]
-            result.append(vec)
+                v_list = [v / norm for v in v_list]
+            result.append(v_list)
         return result
 
     @staticmethod

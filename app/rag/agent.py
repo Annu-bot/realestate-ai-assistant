@@ -67,11 +67,13 @@ _BOTH_KEYWORDS = {
 }
 
 _FREE_MODELS = [
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "liquid/lfm-3-1.7b:free",
+    "baidu/ernie-5.5-flash-preview:free",
     "openrouter/free",
-    "deepseek/deepseek-r1:free",
-    "meta-llama/llama-3.2-3b-instruct:free",
-    "qwen/qwen-2.5-coder-32b-instruct:free",
-    "mistralai/mistral-small-24b-instruct-2501:free",
 ]
 
 
@@ -324,20 +326,35 @@ class PropTechAgent:
 
     def _generate_suggestions(self, query: str, intent: str) -> list[str]:
         q_lower = query.lower()
-        if any(w in q_lower for w in ["villa", "haven", "trump", "aida", "golf", "oman"]):
+        if any(w in q_lower for w in ["unit", "layout", "bedroom", "floor plan"]):
             return [
-                "What are the payment plans and expected handover timeline?",
-                "Can you detail the architectural partners and luxury amenities?"
+                "What waterfront views and leisure amenities are offered at Urban Oasis?",
+                "What are the starting prices and flexible payment plans for Missoni residences?"
+            ]
+        elif any(w in q_lower for w in ["amenit", "facility", "pool", "view", "gym"]):
+            return [
+                "Which Dubai developments feature infinity pools and direct canal access?",
+                "What designer brands are collaborating on DarGlobal interiors?"
+            ]
+        elif any(w in q_lower for w in ["trump", "hotel", "oman", "aida", "golf"]):
+            return [
+                "What are the passive rental yields for Trump International Hotel rooms?",
+                "What community facilities surround the Trump Golf Club in Oman?"
+            ]
+        elif any(w in q_lower for w in ["auction", "infath", "enjaz"]):
+            return [
+                "What deposit is required to participate in official Wasalt auctions?",
+                "Are commercial buildings and development plots included in upcoming auctions?"
+            ]
+        elif any(w in q_lower for w in ["dubai"]):
+            return [
+                "What unit types and layouts are available in Urban Oasis by Missoni?",
+                "What are the starting prices and flexible payment plans for Dubai towers?"
             ]
         elif intent == "wasalt" or any(w in q_lower for w in ["saudi", "riyadh", "jeddah", "wasalt"]):
             return [
-                "What are the verified rental yields across Riyadh districts?",
-                "How can international investors participate in Saudi property auctions?"
-            ]
-        elif any(w in q_lower for w in ["missoni", "dubai", "urban oasis", "apartment"]):
-            return [
-                "What unit types and layouts are available in Urban Oasis by Missoni?",
-                "What waterfront views and building amenities are offered?"
+                "What are the average villa rental prices in central Riyadh districts?",
+                "How can international buyers utilize Wasalt's Matchmaker service?"
             ]
         else:
             return [
@@ -347,19 +364,47 @@ class PropTechAgent:
 
     def _synthesize_clean_fallback(self, query: str, intent: str, retrieved_docs: list[dict]) -> str:
         q_lower = query.lower()
-        if "wasalt" in q_lower or intent == "wasalt" or any(w in q_lower for w in ["saudi", "riyadh", "jeddah"]):
+        if any(w in q_lower for w in ["unit", "layout", "bedroom", "floor plan"]):
             return (
-                "Wasalt provides verified residential and commercial opportunities across Saudi Arabia:\n\n"
-                "• **Residential Listings:** Comprehensive search for luxury villas, modern apartments, and rental properties across Riyadh, Jeddah, and major regions.\n"
-                "• **Digital Property Auctions:** Direct access to verified commercial and residential real estate auctions via official partners Infath and Enjaz.\n"
-                "• **Matchmaker Platform:** Smart matching connecting verified buyers and tenants directly with licensed property brokers."
+                "Urban Oasis by Missoni offers tailored luxury waterfront residences on the Dubai Canal:\n\n"
+                "• **Apartment Configurations:** Premium 1, 2, and 3-bedroom residences along with exclusive top-floor penthouses.\n"
+                "• **Bespoke Missoni Design:** Distinctive interior aesthetic curated with Missoni Home patterns, expansive glass facades, and private balconies.\n"
+                "• **Canal & Skyline Views:** Dual panoramic exposures capturing the Dubai Water Canal and the Downtown Dubai skyline."
             )
-        elif "darglobal" in q_lower or intent == "darglobal" or any(w in q_lower for w in ["dubai", "oman", "villa", "hotel", "trump", "missoni"]):
+        elif any(w in q_lower for w in ["amenit", "facility", "pool", "view", "gym"]):
             return (
-                "DarGlobal develops high-end branded residences and international luxury communities:\n\n"
-                "• **Urban Oasis by Missoni (Dubai):** Waterfront residences on the Dubai Canal featuring bespoke Missoni interior design and infinity pool facilities.\n"
-                "• **Trump International Hotel & Golf Villas (AIDA, Oman):** Exclusive clifftop villas overlooking the Gulf of Oman, integrated with a championship golf course.\n"
-                "• **DG1 Living (Business Bay, Dubai):** Distinctive architectural tower offering direct canal vistas and proximity to Downtown Dubai."
+                "DarGlobal developments feature world-class hospitality and residential amenities:\n\n"
+                "• **Waterfront Leisure:** Infinity swimming pools overlooking the canal, landscaped aquatic decks, and private walkways.\n"
+                "• **Wellness & Fitness:** State-of-the-art gymnasium facilities, private spa suites, and resident wellness clubs.\n"
+                "• **Concierge & Hospitality:** 24/7 dedicated concierge services, valet parking, and smart building access control."
+            )
+        elif any(w in q_lower for w in ["trump", "hotel", "oman", "aida", "golf"]):
+            return (
+                "Trump International Hotel & Golf Villas in AIDA, Oman represent flagship luxury resort living:\n\n"
+                "• **Championship Golf Living:** 4, 5, and 6-bedroom clifftop villas integrated with an 18-hole Trump International Golf Club.\n"
+                "• **5-Star Trump Hotel:** High-end hospitality suites offering passive rental yields with two weeks of annual complimentary owner stays.\n"
+                "• **Coastal Elevation:** Perched 130 meters above sea level overlooking the Sea of Oman with private beaches."
+            )
+        elif any(w in q_lower for w in ["auction", "infath", "enjaz"]):
+            return (
+                "Wasalt hosts verified real estate auctions across Saudi Arabia in partnership with official entities:\n\n"
+                "• **Official Digital Auctions:** Real-time online bidding on court-mandated and institutional real estate via Infath and Enjaz.\n"
+                "• **Asset Diversity:** Commercial towers, development land parcels, and residential properties across Riyadh and Jeddah.\n"
+                "• **Transparent Verification:** Certified legal title deeds and transparent deposit and registration procedures."
+            )
+        elif any(w in q_lower for w in ["dubai"]):
+            return (
+                "DarGlobal’s premier Dubai portfolio features landmark architectural developments:\n\n"
+                "• **Urban Oasis by Missoni (Business Bay):** Luxury canal-facing residences featuring custom Italian fashion interiors.\n"
+                "• **DG1 Living (Dubai Water Canal):** Distinctive architectural tower with panoramic canal and city skyline views.\n"
+                "• **DaVinci Tower by Pagani (Downtown Dubai):** Ultra-luxury bespoke residences designed in collaboration with Pagani Automobili."
+            )
+        elif "wasalt" in q_lower or intent == "wasalt" or any(w in q_lower for w in ["saudi", "riyadh", "jeddah"]):
+            return (
+                "Wasalt is Saudi Arabia's leading property platform providing comprehensive real estate services:\n\n"
+                "• **Verified Residential Listings:** Thousands of villas, townhouses, and modern apartments for rent and sale in Riyadh, Jeddah, and Dammam.\n"
+                "• **Interactive Neighborhood Insights:** District-level pricing, nearby schools, mosques, and transport infrastructure.\n"
+                "• **Matchmaker Service:** Intelligent search connecting verified prospective buyers with certified real estate brokers."
             )
         else:
             return (

@@ -155,6 +155,12 @@ class VectorStore:
 
         return results
 
+    def clear(self) -> None:
+        """Clear all indexed document chunks for clean re-ingestion."""
+        self._conn.execute(f"DELETE FROM {TABLE_NAME}")
+        self._conn.commit()
+        logger.info("Cleared %s table in VectorStore.", TABLE_NAME)
+
     def health_check(self) -> str:
         """Return the health status and engine name."""
         return "sqlite-embedded"

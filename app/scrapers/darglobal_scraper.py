@@ -144,24 +144,56 @@ def discover_links(session: cffi_requests.Session, seed_urls: list[str]) -> list
                     found_links.add(clean_url)
         except Exception:
             pass
-        time.sleep(1)
+        time.sleep(0.5)
 
     return sorted(list(found_links))
 
 
-def main(max_pages: int = 12):
+# Seed URLs covering DarGlobal corporate, masterplans, and signature luxury developments
+SEED_PROJECT_URLS = [
+    "https://darglobal.co.uk",
+    "https://darglobal.co.uk/projects",
+    "https://darglobal.co.uk/urban-oasis",
+    "https://darglobal.co.uk/urban-oasis-by-missoni",
+    "https://darglobal.co.uk/projects/urban-oasis",
+    "https://darglobal.co.uk/dg1",
+    "https://darglobal.co.uk/projects/dg1",
+    "https://darglobal.co.uk/da-vinci-tower",
+    "https://darglobal.co.uk/projects/da-vinci-tower",
+    "https://darglobal.co.uk/the-astera",
+    "https://darglobal.co.uk/w-residences-dubai-downtown",
+    "https://darglobal.co.uk/tierra-viva",
+    "https://darglobal.co.uk/marea",
+    "https://darglobal.co.uk/les-vagues",
+    "https://darglobal.co.uk/trump-international-hotel-tower-dubai",
+    "https://darglobal.co.uk/aida",
+    "https://darglobal.co.uk/aida-trump-international-hotel",
+    "https://darglobal.co.uk/aida-trump-villas",
+    "https://darglobal.co.uk/aida-trump-international-cliff-villas",
+    "https://darglobal.co.uk/aida-coastal-investment-villas",
+    "https://darglobal.co.uk/Sunrise-Haven-Luxury-Villas",
+    "https://darglobal.co.uk/amour-sans-detour",
+    "https://darglobal.co.uk/about",
+]
+
+
+def main(max_pages: int = 30):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     session = cffi_requests.Session(impersonate="chrome120")
 
     print("Discovering live links from DarGlobal dynamically …")
-    seed_urls = ["https://darglobal.co.uk", "https://darglobal.co.uk/projects"]
-    discovered = discover_links(session, seed_urls)
+    discovered = discover_links(session, SEED_PROJECT_URLS)
     
-    # Prioritize project and info pages
-    target_urls = [u for u in discovered if u not in seed_urls]
-    crawl_list = seed_urls + target_urls[:max_pages - len(seed_urls)]
+    # Deduplicate and build prioritized crawl list
+    crawl_list = []
+    for u in SEED_PROJECT_URLS:
+        if u not in crawl_list and len(crawl_list) < max_pages:
+            crawl_list.append(u)
+    for u in discovered:
+        if u not in crawl_list and len(crawl_list) < max_pages:
+            crawl_list.append(u)
     
-    print(f"Found {len(discovered)} live URLs. Crawling top {len(crawl_list)} verified pages:")
+    print(f"Found {len(discovered)} live URLs. Crawling up to {len(crawl_list)} verified pages:")
     all_records = []
     total_chars = 0
 
