@@ -67,13 +67,11 @@ _BOTH_KEYWORDS = {
 }
 
 _FREE_MODELS = [
+    "openrouter/free",
     "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
     "nvidia/nemotron-3.5-lightning:free",
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-    "liquid/lfm-3-1.7b:free",
     "baidu/ernie-5.5-flash-preview:free",
-    "openrouter/free",
 ]
 
 
@@ -114,11 +112,18 @@ def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
                 model=model,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=450,
+                max_tokens=800,
             )
             content = response.choices[0].message.content
             if content and content.strip():
-                return content.strip()
+                text = content.strip()
+                lines = text.split("\n")
+                if lines and lines[-1].strip().startswith(("-", "•", "*")):
+                    last_line = lines[-1].strip()
+                    if len(last_line) < 15 or not any(last_line.endswith(p) for p in [".", "!", "?", "”", ")"]):
+                        lines.pop()
+                        text = "\n".join(lines).strip()
+                return text
         except Exception as exc:
             logger.warning("Model %s failed (%s). Trying next...", model, exc)
             with open("openrouter_debug.log", "a", encoding="utf-8") as f:
@@ -367,9 +372,9 @@ class PropTechAgent:
         if any(w in q_lower for w in ["unit", "layout", "bedroom", "floor plan"]):
             return (
                 "Urban Oasis by Missoni offers tailored luxury waterfront residences on the Dubai Canal:\n\n"
-                "• **Apartment Configurations:** Premium 1, 2, and 3-bedroom residences along with exclusive top-floor penthouses.\n"
-                "• **Bespoke Missoni Design:** Distinctive interior aesthetic curated with Missoni Home patterns, expansive glass facades, and private balconies.\n"
-                "• **Canal & Skyline Views:** Dual panoramic exposures capturing the Dubai Water Canal and the Downtown Dubai skyline."
+                "• **Apartment Configurations:** Studios, 1, 2, and 3-bedroom luxury residences alongside exclusive 4-bedroom penthouses.\n"
+                "• **Open Layouts & Private Access:** Expansive open-plan living rooms with private elevator foyers for penthouses and panoramic canal glass.\n"
+                "• **Bespoke Missoni Design:** Custom interiors featuring MissoniHome color palettes, high-end Italian textiles, and private balconies."
             )
         elif any(w in q_lower for w in ["amenit", "facility", "pool", "view", "gym"]):
             return (

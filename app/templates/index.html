@@ -858,10 +858,14 @@
       .replace(/\|[-:\s|]+\|/g, '')
       .replace(/\|/g, ' · ');
 
+    // Convert markdown bullets (- or *) at start of lines into consistent standard bullets
+    clean = clean.replace(/^[ \t]*[-*•][ \t]+/gm, '• ');
+
     return clean
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/•\s*/g, '<span style="color:#c9a84c;font-weight:bold;margin-right:6px;">•</span>')
       .replace(/\n\n+/g, '<br><br>')
       .replace(/\n/g, '<br>');
   }
