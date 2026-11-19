@@ -67,11 +67,11 @@ _BOTH_KEYWORDS = {
 }
 
 _FREE_MODELS = [
+    "nvidia/nemotron-3.5-lightning:free",
+    "baidu/ernie-5.5-flash-preview:free",
     "openrouter/free",
     "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
-    "nvidia/nemotron-3.5-lightning:free",
-    "baidu/ernie-5.5-flash-preview:free",
 ]
 
 
@@ -104,7 +104,8 @@ def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key,
-            timeout=8.0,
+            timeout=7.0,
+            max_retries=0,
             default_headers={
                 "HTTP-Referer": "http://localhost:8000",
                 "X-Title": "PropTech AI Advisor",
@@ -120,7 +121,8 @@ def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
                     temperature=temperature,
                     max_tokens=800,
                 )
-                content = response.choices[0].message.content
+                msg = response.choices[0].message
+                content = msg.content or getattr(msg, "reasoning", None) or getattr(msg, "text", None) or ""
                 if content and content.strip():
                     text = content.strip()
                     lines = text.split("\n")
