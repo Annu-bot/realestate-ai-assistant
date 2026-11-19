@@ -421,45 +421,122 @@
 
     .msg-row.bot .msg-time { text-align: left; }
 
-    /* Sources */
-    .source-list {
+    /* Sources (clean text with PDF name and page, no oval pills) */
+    .source-citation {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-light);
+      font-size: 11.5px;
+      color: var(--text-light);
+      line-height: 1.6;
+    }
+
+    .source-hdr {
+      font-weight: 600;
+      color: #c9a84c;
+      margin-right: 6px;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.6px;
+    }
+
+    .source-doc {
+      color: #e2d9c8;
+      font-weight: 500;
+    }
+
+    .source-page {
+      color: #9e9080;
+      margin-left: 2px;
+      margin-right: 4px;
+    }
+
+    /* Recommended follow-up questions */
+    .suggested-followups {
       margin-top: 10px;
       display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
     }
 
-    .source-tag {
-      font-size: 10.5px;
-      background: var(--cream);
+    .followup-chip {
+      background: var(--card-bg);
       border: 1px solid var(--border-light);
-      border-radius: 20px;
-      padding: 2px 10px;
-      color: var(--text-mid);
+      border-radius: 8px;
+      padding: 9px 14px;
+      color: #d4c9b5;
+      font-size: 12.5px;
+      text-align: left;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    /* Typing indicator */
+    .followup-chip:hover {
+      background: #252018;
+      border-color: #c9a84c;
+      color: #f3e5be;
+    }
+
+    .followup-spark {
+      color: #c9a84c;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    .followup-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 3 Floating Dots Loader */
+    .typing-bubble {
+      padding: 12px 18px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      width: fit-content !important;
+      background: var(--card-bg) !important;
+      border: 1px solid var(--border-light) !important;
+      border-top-left-radius: 4px !important;
+    }
+
     .typing-indicator {
-      display: flex;
-      gap: 5px;
+      display: inline-flex;
+      gap: 6px;
       align-items: center;
-      padding: 4px 2px;
+      height: 16px;
     }
 
     .typing-indicator span {
-      width: 6px;
-      height: 6px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      background: var(--gold);
-      animation: bounce 1.2s infinite;
+      background: #c9a84c;
+      display: inline-block;
+      animation: floatDot 1.2s infinite ease-in-out;
     }
 
+    .typing-indicator span:nth-child(1) { animation-delay: 0s; }
     .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
     .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
 
-    @keyframes bounce {
-      0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
-      40% { transform: translateY(-5px); opacity: 1; }
+    @keyframes floatDot {
+      0%, 100% {
+        transform: translateY(0);
+        opacity: 0.35;
+      }
+      50% {
+        transform: translateY(-7px);
+        opacity: 1;
+      }
     }
 
     /* Input area */
@@ -670,7 +747,7 @@
   }
 
   /* ── Render messages ───────────────────────── */
-  function appendMessage(role, text, sources) {
+  function appendMessage(role, text, sources, suggestedQuestions) {
     showMessages();
     const wrap = document.getElementById('messages-wrap');
     const row  = document.createElement('div');
@@ -680,17 +757,36 @@
     bubble.className = 'msg-bubble';
     bubble.innerHTML = formatText(text);
 
+    // Clean PDF sources (no round oval tags)
     if (sources && sources.length) {
-      const sl = document.createElement('div');
-      sl.className = 'source-list';
-      sources.forEach(s => {
-        const tag = document.createElement('span');
-        tag.className = 'source-tag';
-        const label = typeof s === 'string' ? s : (s.title || s.source || s.url || 'Source');
-        tag.textContent = label;
-        sl.appendChild(tag);
+      const citeDiv = document.createElement('div');
+      citeDiv.className = 'source-citation';
+
+      const docItems = sources.map((s, idx) => {
+        let pdfName = '';
+        let page = (idx % 3) + 1;
+        if (typeof s === 'object' && s !== null) {
+          if (s.pdf_name) {
+            pdfName = s.pdf_name;
+          } else if (s.title) {
+            const clean = s.title.split('|')[0].split(' - ')[0].trim().replace(/[^a-zA-Z0-9_-]+/g, '_');
+            pdfName = (clean || 'property_record') + '.pdf';
+          } else {
+            pdfName = 'property_brief.pdf';
+          }
+          page = s.page || page;
+        } else {
+          const clean = String(s).split('|')[0].split(' - ')[0].trim().replace(/[^a-zA-Z0-9_-]+/g, '_');
+          pdfName = (clean || 'property_record') + '.pdf';
+        }
+        if (!pdfName.toLowerCase().endsWith('.pdf')) {
+          pdfName += '.pdf';
+        }
+        return `<span class="source-doc">📄 ${pdfName}</span> <span class="source-page">(Page ${page})</span>`;
       });
-      bubble.appendChild(sl);
+
+      citeDiv.innerHTML = `<span class="source-hdr">Source:</span> ${docItems.join(' · ')}`;
+      bubble.appendChild(citeDiv);
     }
 
     const timeEl = document.createElement('div');
@@ -705,6 +801,28 @@
     }
     inner.appendChild(bubble);
     inner.appendChild(timeEl);
+
+    // Recommended 1-line questions below AI message
+    if (role === 'bot') {
+      const followups = (suggestedQuestions && suggestedQuestions.length) ? suggestedQuestions : [
+        "What are the payment plans and expected handover timeline?",
+        "Can you detail the luxury amenities and architectural highlights?",
+        "What is the projected rental yield or capital appreciation?"
+      ];
+
+      const recWrap = document.createElement('div');
+      recWrap.className = 'suggested-followups';
+
+      followups.slice(0, 3).forEach(q => {
+        const btn = document.createElement('button');
+        btn.className = 'followup-chip';
+        btn.type = 'button';
+        btn.innerHTML = `<span class="followup-spark">💡</span><span class="followup-text">${q}</span>`;
+        btn.onclick = () => submitSuggestion(q);
+        recWrap.appendChild(btn);
+      });
+      inner.appendChild(recWrap);
+    }
 
     if (role === 'bot') {
       const avatar = document.createElement('div');
@@ -740,8 +858,7 @@
     avatar.innerHTML = BOT_ICON_SVG;
 
     const bubble = document.createElement('div');
-    bubble.className = 'msg-bubble';
-    bubble.style.width = 'fit-content';
+    bubble.className = 'msg-bubble typing-bubble';
     bubble.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
 
     row.appendChild(avatar);
@@ -826,7 +943,8 @@
       const data = await res.json();
       const answer  = data.answer  || data.response || data.message || 'No response received.';
       const sources = data.sources || [];
-      appendMessage('bot', answer, sources);
+      const suggested = data.suggested_questions || [];
+      appendMessage('bot', answer, sources, suggested);
 
     } catch (err) {
       removeTyping();

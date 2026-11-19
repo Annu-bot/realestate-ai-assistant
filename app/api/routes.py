@@ -28,6 +28,7 @@ class ChatResponse(BaseModel):
     sources: list
     intent: str
     session_id: str
+    suggested_questions: Optional[list] = None
 
 
 class HealthResponse(BaseModel):
@@ -90,6 +91,7 @@ async def chat(request: ChatRequest):
             sources=result.get("sources", []),
             intent=result.get("intent", "general"),
             session_id=request.session_id,
+            suggested_questions=result.get("suggested_questions", []),
         )
     except Exception as exc:
         logger.exception("Error during chat: %s", exc)

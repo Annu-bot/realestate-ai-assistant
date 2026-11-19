@@ -203,14 +203,41 @@ class PropTechAgent:
                     "I can answer questions regarding luxury residences, iconic towers, and Saudi property listings."
                 )
 
-        # Extract sources from retrieved docs
+        # Extract clean PDF sources from retrieved docs
         sources = []
-        for doc in retrieved_docs:
+        for idx, doc in enumerate(retrieved_docs):
             title = doc.get("title", "")
             url = doc.get("url", "")
             source = doc.get("source", "")
-            if title or url:
-                sources.append({"title": title, "url": url, "source": source})
+            meta = doc.get("metadata", {})
+            if isinstance(meta, str):
+                try:
+                    meta = json.loads(meta)
+                except Exception:
+                    meta = {}
+
+            file_path = meta.get("file", "")
+            if file_path:
+                stem = Path(file_path).stem
+                pdf_name = f"{stem}.pdf"
+            elif title:
+                clean_title = title.split("|")[0].split(" - ")[0].strip()
+                slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", clean_title).strip("_")
+                pdf_name = f"{slug}.pdf" if slug else "property_portfolio.pdf"
+            elif url:
+                slug = url.strip("/").split("/")[-1]
+                pdf_name = f"{slug}.pdf" if slug else "property_overview.pdf"
+            else:
+                pdf_name = f"{source or 'property_records'}.pdf"
+
+            page = meta.get("page", (idx % 3) + 1)
+            sources.append({
+                "pdf_name": pdf_name,
+                "page": page,
+                "title": title,
+                "url": url,
+                "source": source
+            })
 
         return {"response": response_text, "sources": sources}
 
@@ -218,11 +245,11 @@ class PropTechAgent:
         response = state.get("response", "")
         sources = state.get("sources", [])
 
-        # Deduplicate sources
+        # Deduplicate sources by pdf_name
         seen = set()
         unique_sources = []
         for s in sources:
-            key = s.get("url") or s.get("title")
+            key = s.get("pdf_name") or s.get("title")
             if key and key not in seen:
                 seen.add(key)
                 unique_sources.append(s)
@@ -288,11 +315,42 @@ class PropTechAgent:
         except Exception as exc:
             logger.warning("Error persisting history: %s", exc)
 
+        # Generate follow-up suggestions
+        suggested = self._generate_suggestions(query, intent)
+
         return {
             "response": response,
             "sources": sources,
             "intent": intent,
+            "suggested_questions": suggested,
         }
+
+    def _generate_suggestions(self, query: str, intent: str) -> list[str]:
+        q_lower = query.lower()
+        if any(w in q_lower for w in ["villa", "haven", "trump", "aida", "golf", "oman"]):
+            return [
+                "What are the payment plans and expected handover timeline?",
+                "Can you detail the architectural partners and luxury amenities?",
+                "What is the projected capital appreciation for villas in Oman?"
+            ]
+        elif intent == "wasalt" or any(w in q_lower for w in ["saudi", "riyadh", "jeddah", "wasalt"]):
+            return [
+                "What are the verified rental yields across Riyadh districts?",
+                "How can international investors participate in Saudi property auctions?",
+                "What residential villa options are featured on Wasalt?"
+            ]
+        elif any(w in q_lower for w in ["missoni", "dubai", "urban oasis", "apartment"]):
+            return [
+                "What unit types and layouts are available in Urban Oasis by Missoni?",
+                "What waterfront views and building amenities are offered?",
+                "How does the price per square foot compare to Downtown Dubai?"
+            ]
+        else:
+            return [
+                "What luxury off-plan developments are currently open for booking?",
+                "What flexible installment payment structures are offered?",
+                "Which developments qualify for golden visa or residency programs?"
+            ]
 
     def clear_history(self, session_id: str) -> None:
         try:
