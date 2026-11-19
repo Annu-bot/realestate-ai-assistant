@@ -57,8 +57,8 @@ Using ONLY the verified context below, provide a clear, direct answer to the use
 
 Response Guidelines:
 - Start directly with 1 short introductory sentence.
-- Follow with 2 to 3 concise bullet points starting with '• '.
-- Keep the entire answer under 6 lines.
+- Follow with 3 to 4 concise bullet points starting with '• '.
+- Keep each bullet strictly 1 to 2 lines.
 - Do not output any thinking steps, analysis, drafts, or meta-disclaimers. Speak authoritatively and concisely.
 
 --- RETRIEVED CONTEXT ---

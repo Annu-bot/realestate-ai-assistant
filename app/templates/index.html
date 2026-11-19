@@ -899,12 +899,15 @@
     // Convert markdown bullets (- or *) at start of lines into consistent standard bullets
     clean = clean.replace(/^[ \t]*[-*•][ \t]+/gm, '• ');
 
+    // Remove empty blank lines between bullet points so they render cleanly together
+    clean = clean.replace(/\n\s*\n\s*•/g, '\n•');
+
     return clean
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/•\s*/g, '<span style="color:#ffffff;font-weight:bold;margin-right:6px;">•</span>')
-      .replace(/\n\n+/g, '<br><br>')
+      .replace(/\n\n+/g, '<div style="height:6px;"></div>')
       .replace(/\n/g, '<br>');
   }
 

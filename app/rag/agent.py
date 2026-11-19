@@ -130,6 +130,9 @@ def _clean_model_output(text: str) -> str:
             lines.pop()
             cleaned = "\n".join(lines).strip()
 
+    # 7. Collapse blank lines between bullets for clean, compact spacing
+    cleaned = re.sub(r"\n{2,}(?=[•\-\*])", "\n", cleaned)
+
     return cleaned.strip()
 
 
@@ -250,7 +253,7 @@ class PropTechAgent:
                 else:
                     source_filter = None if intent == "general" else intent
                     retrieved_docs = self.vector_store.similarity_search(
-                        query_embedding, k=5, source_filter=source_filter
+                        query_embedding, k=6, source_filter=source_filter
                     )
                     logger.info("retriever_node: retrieved %d docs for intent=%s", len(retrieved_docs), intent)
         except Exception as exc:
