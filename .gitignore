@@ -9,3 +9,5 @@ data/processed/vector_index/
 .DS_Store
 venv/
 .venv/
+*.log
+openrouter_debug.log
