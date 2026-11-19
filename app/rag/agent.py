@@ -319,7 +319,8 @@ class PropTechAgent:
 
             file_path = meta.get("file", "")
             if file_path:
-                stem = Path(file_path).stem
+                clean_path = str(file_path).replace("\\", "/")
+                stem = Path(clean_path).stem
                 pdf_name = f"{stem}.pdf"
             elif title:
                 clean_title = title.split("|")[0].split(" - ")[0].strip()

@@ -807,7 +807,7 @@
         let page = (idx % 3) + 1;
         if (typeof s === 'object' && s !== null) {
           if (s.pdf_name) {
-            pdfName = s.pdf_name;
+            pdfName = String(s.pdf_name).replace(/\\/g, '/').split('/').pop();
           } else if (s.title) {
             const clean = s.title.split('|')[0].split(' - ')[0].trim().replace(/[^a-zA-Z0-9_-]+/g, '_');
             pdfName = (clean || 'property_record') + '.pdf';
@@ -816,7 +816,8 @@
           }
           page = s.page || page;
         } else {
-          const clean = String(s).split('|')[0].split(' - ')[0].trim().replace(/[^a-zA-Z0-9_-]+/g, '_');
+          const raw = String(s).replace(/\\/g, '/').split('/').pop();
+          const clean = raw.split('|')[0].split(' - ')[0].trim().replace(/[^a-zA-Z0-9_-]+/g, '_');
           pdfName = (clean || 'property_record') + '.pdf';
         }
         if (!pdfName.toLowerCase().endsWith('.pdf')) {

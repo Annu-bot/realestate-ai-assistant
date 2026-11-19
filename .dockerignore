@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+env/
+venv/
+.pytest_cache
+.coverage
+htmlcov/
+*.log
+openrouter_debug.log
