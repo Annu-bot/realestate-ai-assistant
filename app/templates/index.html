@@ -292,11 +292,17 @@
 
     /* Suggestion chips */
     .suggestions {
-      display: flex;
-      flex-direction: row;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 12px;
       width: 100%;
-      max-width: 760px;
+      max-width: 820px;
+    }
+
+    @media (max-width: 680px) {
+      .suggestions {
+        grid-template-columns: 1fr;
+      }
     }
 
     .chip {
@@ -310,7 +316,6 @@
       border-radius: var(--radius);
       cursor: pointer;
       text-align: left;
-      flex: 1;
       transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
       font-family: var(--font-sans);
     }
@@ -684,9 +689,19 @@
           <span class="chip-query">What luxury projects does DarGlobal have in Dubai?</span>
         </button>
 
+        <button class="chip" onclick="submitSuggestion('What branded residences does DarGlobal offer in collaboration with Pagani?')">
+          <span class="chip-icon gold">🏎️</span>
+          <span class="chip-query">What branded residences does DarGlobal offer in collaboration with Pagani?</span>
+        </button>
+
         <button class="chip" onclick="submitSuggestion('What residential properties are available on Wasalt in Saudi Arabia?')">
           <span class="chip-icon teal">🗺️</span>
           <span class="chip-query">What residential properties are available on Wasalt in Saudi Arabia?</span>
+        </button>
+
+        <button class="chip" onclick="submitSuggestion('What real estate auction services are hosted on Wasalt in Saudi Arabia?')">
+          <span class="chip-icon teal">⚖️</span>
+          <span class="chip-query">What real estate auction services are hosted on Wasalt in Saudi Arabia?</span>
         </button>
 
       </div>
@@ -865,7 +880,7 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/•\s*/g, '<span style="color:#c9a84c;font-weight:bold;margin-right:6px;">•</span>')
+      .replace(/•\s*/g, '<span style="color:#ffffff;font-weight:bold;margin-right:6px;">•</span>')
       .replace(/\n\n+/g, '<br><br>')
       .replace(/\n/g, '<br>');
   }

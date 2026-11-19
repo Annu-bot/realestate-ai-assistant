@@ -165,16 +165,27 @@ class PropTechAgent:
     def _retriever_node(self, state: AgentState) -> dict:
         query = state.get("query", "")
         intent = state.get("intent", "both")
-        source_filter = None if intent in ("both", "general") else intent
 
         retrieved_docs: list[dict] = []
         try:
             if self.embedder and self.vector_store:
                 query_embedding = self.embedder.embed_texts([query])[0]
-                retrieved_docs = self.vector_store.similarity_search(
-                    query_embedding, k=5, source_filter=source_filter
-                )
-                logger.info("retriever_node: retrieved %d docs for intent=%s", len(retrieved_docs), intent)
+                if intent == "both":
+                    # Retrieve balanced context from both companies for comparison queries
+                    docs_dg = self.vector_store.similarity_search(
+                        query_embedding, k=3, source_filter="darglobal"
+                    )
+                    docs_ws = self.vector_store.similarity_search(
+                        query_embedding, k=3, source_filter="wasalt"
+                    )
+                    retrieved_docs = docs_dg + docs_ws
+                    logger.info("retriever_node (both): retrieved %d DarGlobal + %d Wasalt docs", len(docs_dg), len(docs_ws))
+                else:
+                    source_filter = None if intent == "general" else intent
+                    retrieved_docs = self.vector_store.similarity_search(
+                        query_embedding, k=5, source_filter=source_filter
+                    )
+                    logger.info("retriever_node: retrieved %d docs for intent=%s", len(retrieved_docs), intent)
         except Exception as exc:
             logger.error("retriever_node error: %s", exc)
 
@@ -351,6 +362,11 @@ class PropTechAgent:
                 "What deposit is required to participate in official Wasalt auctions?",
                 "Are commercial buildings and development plots included in upcoming auctions?"
             ]
+        elif any(w in q_lower for w in ["difference", "compare", "comparison", "versus", "vs", "distinction"]) or (("darglobal" in q_lower or "dar global" in q_lower) and "wasalt" in q_lower) or intent == "both":
+            return [
+                "What luxury off-plan developments does DarGlobal currently offer?",
+                "How can international buyers utilize Wasalt's Matchmaker service?"
+            ]
         elif any(w in q_lower for w in ["dubai"]):
             return [
                 "What unit types and layouts are available in Urban Oasis by Missoni?",
@@ -396,6 +412,13 @@ class PropTechAgent:
                 "• **Official Digital Auctions:** Real-time online bidding on court-mandated and institutional real estate via Infath and Enjaz.\n"
                 "• **Asset Diversity:** Commercial towers, development land parcels, and residential properties across Riyadh and Jeddah.\n"
                 "• **Transparent Verification:** Certified legal title deeds and transparent deposit and registration procedures."
+            )
+        elif any(w in q_lower for w in ["difference", "compare", "comparison", "versus", "vs", "distinction"]) or (("darglobal" in q_lower or "dar global" in q_lower) and "wasalt" in q_lower) or intent == "both":
+            return (
+                "DarGlobal and Wasalt serve distinct, complementary roles in real estate:\n\n"
+                "• **DarGlobal (Luxury Property Developer):** London-listed developer creating high-end branded residences (Missoni, Pagani, Trump, Aston Martin) across Dubai, Oman, Spain, and Qatar.\n"
+                "• **Wasalt (Digital Property Marketplace):** Saudi Arabia's leading property portal for browsing residential listings, rentals, and bidding on official Infath real estate auctions.\n"
+                "• **Strategic Focus:** DarGlobal builds and owns physical luxury developments, whereas Wasalt is a digital marketplace connecting buyers, renters, and brokers."
             )
         elif any(w in q_lower for w in ["dubai"]):
             return (
