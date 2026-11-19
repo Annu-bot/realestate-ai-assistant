@@ -51,20 +51,20 @@ def router_prompt(query: str) -> str:
 # Used to build the full prompt sent to the LLM for answer generation.
 # ---------------------------------------------------------------------------
 GENERATOR_PROMPT = """\
-You are an expert real estate advisor with deep knowledge about:
-- DarGlobal: an international luxury property developer with landmark projects in Dubai and beyond.
-- Wasalt: Saudi Arabia's leading digital real estate marketplace for buying, selling, and renting.
+You are an expert luxury real estate advisor with knowledge about DarGlobal (luxury developer in Dubai, Oman, and international markets) and Wasalt (Saudi Arabia's premier property platform).
 
-Use the retrieved context below to answer the user's question. \
-Cite the source (DarGlobal or Wasalt) for every piece of information you provide. \
-If a detail is not in the context, say so honestly rather than fabricating information.
+Answer the user's question directly, accurately, and concisely using the verified context below.
+
+STRICT FORMATTING & STYLE INSTRUCTIONS:
+1. Structure: Start with 1 short introductory sentence, followed by 2 to 3 concise bullet points containing the key facts (locations, project highlights, amenities, or platform services).
+2. Length: Strictly keep the entire response short and scannable (under 6 lines total).
+3. No Markdown Tables: Never output markdown tables or pipe symbols (|). Use clean bullet points.
+4. No Filler or Disclaimers: Do NOT say "Based on the retrieved context..." or end sentences abruptly with "...". Speak authoritatively as a knowledgeable real estate advisor.
+5. Specifics: Highlight confirmed developments, locations, and architectural features present in the records.
 
 --- RETRIEVED CONTEXT ---
 {context}
 --- END CONTEXT ---
-
-Answer in a professional, helpful tone. \
-If property details (location, price, amenities) are available in context, include them.
 """
 
 
@@ -81,11 +81,7 @@ def format_docs_as_context(docs: list[dict]) -> str:
     """
     Convert a list of retrieved document dicts into a formatted context string.
 
-    Each doc dict is expected to have at least:
-        - 'content' or 'text': the chunk text
-        - 'source': 'darglobal' or 'wasalt'
-        - 'title' (optional): document title
-        - 'url' (optional): source URL
+    Supports 'chunk_text', 'content', and 'text' keys from the vector store.
     """
     if not docs:
         return "No relevant context found."
@@ -95,7 +91,12 @@ def format_docs_as_context(docs: list[dict]) -> str:
         source_label = doc.get("source", "unknown").upper()
         title = doc.get("title", "")
         url = doc.get("url", "")
-        content = doc.get("content") or doc.get("text", "")
+        content = (
+            doc.get("chunk_text")
+            or doc.get("content")
+            or doc.get("text")
+            or ""
+        )
 
         header = f"[{i}] Source: {source_label}"
         if title:

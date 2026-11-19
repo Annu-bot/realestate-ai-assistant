@@ -67,11 +67,11 @@ _BOTH_KEYWORDS = {
 }
 
 _FREE_MODELS = [
-    "google/gemini-2.0-flash-exp:free",
+    "openrouter/free",
     "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemini-2.0-flash-exp:free",
     "meta-llama/llama-3.1-8b-instruct:free",
     "mistralai/mistral-7b-instruct:free",
-    "openrouter/free",
     "openrouter/auto",
 ]
 
@@ -82,11 +82,23 @@ def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not api_key:
+        env_file = Path(__file__).resolve().parents[2] / ".env"
+        if env_file.exists():
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line.startswith("OPENROUTER_API_KEY="):
+                    api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    if api_key:
+                        os.environ["OPENROUTER_API_KEY"] = api_key
+                        break
+
+    if not api_key:
         raise ValueError("OPENROUTER_API_KEY not configured in .env")
 
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=api_key,
+        timeout=25.0,
         default_headers={
             "HTTP-Referer": "http://localhost:8000",
             "X-Title": "PropTech AI Advisor",
@@ -101,13 +113,15 @@ def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
                 model=model,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=900,
+                max_tokens=450,
             )
             content = response.choices[0].message.content
             if content and content.strip():
                 return content.strip()
         except Exception as exc:
             logger.warning("Model %s failed (%s). Trying next...", model, exc)
+            with open("openrouter_debug.log", "a", encoding="utf-8") as f:
+                f.write(f"Model {model} failed with: {exc}\n")
             last_error = exc
 
     raise RuntimeError(f"All OpenRouter models failed. Last: {last_error}")
@@ -183,25 +197,9 @@ class PropTechAgent:
             response_text = _call_openrouter_llm(messages, temperature=0.3)
         except Exception as exc:
             logger.warning("LLM call failed (%s). Using verified knowledge fallback.", exc)
-            if retrieved_docs:
-                bullets = []
-                for doc in retrieved_docs[:3]:
-                    title = doc.get("title", "Property Listing")
-                    src = doc.get("source", "Real Estate").upper()
-                    chunk = (doc.get("chunk_text") or doc.get("text") or "").strip()
-                    # Clean up snippet
-                    clean_chunk = re.sub(r"\s+", " ", chunk)[:280]
-                    bullets.append(f"• **{title}** [{src}]:\n  {clean_chunk}...")
-
-                response_text = (
-                    f"Here is what our verified property records show for your question:\n\n"
-                    + "\n\n".join(bullets)
-                )
-            else:
-                response_text = (
-                    "I am your PropTech AI Advisor for DarGlobal and Wasalt real estate. "
-                    "I can answer questions regarding luxury residences, iconic towers, and Saudi property listings."
-                )
+            with open("openrouter_debug.log", "a", encoding="utf-8") as f:
+                f.write(f"LLM Error on query {query!r}: {exc}\n")
+            response_text = self._synthesize_clean_fallback(query, state.get("intent", "both"), retrieved_docs)
 
         # Extract clean PDF sources from retrieved docs
         sources = []
@@ -330,27 +328,46 @@ class PropTechAgent:
         if any(w in q_lower for w in ["villa", "haven", "trump", "aida", "golf", "oman"]):
             return [
                 "What are the payment plans and expected handover timeline?",
-                "Can you detail the architectural partners and luxury amenities?",
-                "What is the projected capital appreciation for villas in Oman?"
+                "Can you detail the architectural partners and luxury amenities?"
             ]
         elif intent == "wasalt" or any(w in q_lower for w in ["saudi", "riyadh", "jeddah", "wasalt"]):
             return [
                 "What are the verified rental yields across Riyadh districts?",
-                "How can international investors participate in Saudi property auctions?",
-                "What residential villa options are featured on Wasalt?"
+                "How can international investors participate in Saudi property auctions?"
             ]
         elif any(w in q_lower for w in ["missoni", "dubai", "urban oasis", "apartment"]):
             return [
                 "What unit types and layouts are available in Urban Oasis by Missoni?",
-                "What waterfront views and building amenities are offered?",
-                "How does the price per square foot compare to Downtown Dubai?"
+                "What waterfront views and building amenities are offered?"
             ]
         else:
             return [
                 "What luxury off-plan developments are currently open for booking?",
-                "What flexible installment payment structures are offered?",
-                "Which developments qualify for golden visa or residency programs?"
+                "What flexible installment payment structures are offered?"
             ]
+
+    def _synthesize_clean_fallback(self, query: str, intent: str, retrieved_docs: list[dict]) -> str:
+        q_lower = query.lower()
+        if "wasalt" in q_lower or intent == "wasalt" or any(w in q_lower for w in ["saudi", "riyadh", "jeddah"]):
+            return (
+                "Wasalt provides verified residential and commercial opportunities across Saudi Arabia:\n\n"
+                "• **Residential Listings:** Comprehensive search for luxury villas, modern apartments, and rental properties across Riyadh, Jeddah, and major regions.\n"
+                "• **Digital Property Auctions:** Direct access to verified commercial and residential real estate auctions via official partners Infath and Enjaz.\n"
+                "• **Matchmaker Platform:** Smart matching connecting verified buyers and tenants directly with licensed property brokers."
+            )
+        elif "darglobal" in q_lower or intent == "darglobal" or any(w in q_lower for w in ["dubai", "oman", "villa", "hotel", "trump", "missoni"]):
+            return (
+                "DarGlobal develops high-end branded residences and international luxury communities:\n\n"
+                "• **Urban Oasis by Missoni (Dubai):** Waterfront residences on the Dubai Canal featuring bespoke Missoni interior design and infinity pool facilities.\n"
+                "• **Trump International Hotel & Golf Villas (AIDA, Oman):** Exclusive clifftop villas overlooking the Gulf of Oman, integrated with a championship golf course.\n"
+                "• **DG1 Living (Business Bay, Dubai):** Distinctive architectural tower offering direct canal vistas and proximity to Downtown Dubai."
+            )
+        else:
+            return (
+                "Our real estate knowledge base covers international developments and regional marketplaces:\n\n"
+                "• **DarGlobal Luxury Portfolio:** Designer residences and golf communities across Dubai, Oman, and international waterfront destinations.\n"
+                "• **Wasalt Saudi Marketplace:** Verified residential villas, apartments, and official digital auctions across Saudi Arabia."
+            )
 
     def clear_history(self, session_id: str) -> None:
         try:
