@@ -75,62 +75,74 @@ _FREE_MODELS = [
 ]
 
 
-def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
-    """Call OpenRouter with multi-model failover."""
-    from openai import OpenAI
-
-    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
-    if not api_key:
+def _get_api_keys() -> list[str]:
+    """Retrieve list of API keys for pool rotation from environment or .env."""
+    raw = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if not raw:
         env_file = Path(__file__).resolve().parents[2] / ".env"
         if env_file.exists():
             for line in env_file.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if line.startswith("OPENROUTER_API_KEY="):
-                    api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    if api_key:
-                        os.environ["OPENROUTER_API_KEY"] = api_key
+                    raw = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    if raw:
+                        os.environ["OPENROUTER_API_KEY"] = raw
                         break
+    return [k.strip() for k in raw.split(",") if k.strip()]
 
-    if not api_key:
+
+def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
+    """Call OpenRouter with multi-key pool rotation and multi-model failover."""
+    from openai import OpenAI
+
+    keys = _get_api_keys()
+    if not keys:
         raise ValueError("OPENROUTER_API_KEY not configured in .env")
 
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key,
-        timeout=25.0,
-        default_headers={
-            "HTTP-Referer": "http://localhost:8000",
-            "X-Title": "PropTech AI Advisor",
-        },
-    )
-
     last_error = None
-    for model in _FREE_MODELS:
-        try:
-            logger.info("Calling OpenRouter with model: %s", model)
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=800,
-            )
-            content = response.choices[0].message.content
-            if content and content.strip():
-                text = content.strip()
-                lines = text.split("\n")
-                if lines and lines[-1].strip().startswith(("-", "•", "*")):
-                    last_line = lines[-1].strip()
-                    if len(last_line) < 15 or not any(last_line.endswith(p) for p in [".", "!", "?", "”", ")"]):
-                        lines.pop()
-                        text = "\n".join(lines).strip()
-                return text
-        except Exception as exc:
-            logger.warning("Model %s failed (%s). Trying next...", model, exc)
-            with open("openrouter_debug.log", "a", encoding="utf-8") as f:
-                f.write(f"Model {model} failed with: {exc}\n")
-            last_error = exc
+    for key_idx, api_key in enumerate(keys):
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+            timeout=8.0,
+            default_headers={
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "PropTech AI Advisor",
+            },
+        )
 
-    raise RuntimeError(f"All OpenRouter models failed. Last: {last_error}")
+        for model in _FREE_MODELS:
+            try:
+                logger.info("Calling OpenRouter with key #%d, model: %s", key_idx + 1, model)
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=800,
+                )
+                content = response.choices[0].message.content
+                if content and content.strip():
+                    text = content.strip()
+                    lines = text.split("\n")
+                    if lines and lines[-1].strip().startswith(("-", "•", "*")):
+                        last_line = lines[-1].strip()
+                        if len(last_line) < 15 or not any(last_line.endswith(p) for p in [".", "!", "?", "”", ")"]):
+                            lines.pop()
+                            text = "\n".join(lines).strip()
+                    return text
+            except Exception as exc:
+                err_str = str(exc)
+                logger.warning("Key #%d model %s failed (%s).", key_idx + 1, model, exc)
+                with open("openrouter_debug.log", "a", encoding="utf-8") as f:
+                    f.write(f"Key #{key_idx + 1} Model {model} failed with: {exc}\n")
+                last_error = exc
+
+                # Fast-break to next key if this key's daily free tier quota is exhausted
+                if "free-models-per-day" in err_str or "openrouter_free_tier_daily" in err_str:
+                    logger.info("Key #%d daily quota reached. Rotating to next key in pool...", key_idx + 1)
+                    break
+
+    raise RuntimeError(f"All OpenRouter keys and models failed. Last: {last_error}")
 
 
 class PropTechAgent:
