@@ -293,30 +293,31 @@
     .suggestions {
       display: flex;
       flex-direction: row;
-      gap: 10px;
+      gap: 12px;
       width: 100%;
-      max-width: 620px;
+      max-width: 760px;
     }
 
     .chip {
       display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 6px;
-      padding: 14px 16px;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
       background: var(--card-bg);
       border: 1px solid var(--border-light);
       border-radius: var(--radius);
       cursor: pointer;
       text-align: left;
       flex: 1;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
       font-family: var(--font-sans);
     }
 
     .chip:hover {
       border-color: var(--gold);
       box-shadow: 0 2px 10px rgba(201,168,76,0.12);
+      background: #231f18;
     }
 
     .chip-icon {
@@ -335,25 +336,13 @@
     .chip-icon.slate  { background: #1e2230; }
     .chip-icon.rose   { background: #2a1510; }
 
-    .chip-text {
+    .chip-query {
+      font-size: 12.5px;
+      color: var(--text-dark);
+      font-weight: 500;
+      line-height: 1.4;
       flex: 1;
     }
-
-    .chip-text strong {
-      display: block;
-      font-size: 12.5px;
-      font-weight: 500;
-      color: var(--text-dark);
-      margin-bottom: 3px;
-    }
-
-    .chip-text span {
-      font-size: 11px;
-      color: var(--text-light);
-      line-height: 1.4;
-    }
-
-    .chip-arrow { display: none; }
 
     /* Messages */
     .messages-wrap {
@@ -563,12 +552,12 @@
 
     .input-row {
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       gap: 10px;
       background: var(--card-bg);
       border: 1.5px solid var(--border-light);
       border-radius: 14px;
-      padding: 10px 12px 10px 16px;
+      padding: 8px 12px 8px 16px;
       transition: border-color 0.2s, box-shadow 0.2s;
       max-width: 840px;
       width: 100%;
@@ -589,9 +578,12 @@
       font-family: var(--font-sans);
       font-size: 14px;
       color: var(--text-dark);
-      line-height: 1.5;
+      line-height: 22px;
       max-height: 120px;
-      min-height: 24px;
+      min-height: 22px;
+      padding: 4px 0;
+      margin: 0;
+      display: block;
     }
 
     #user-input::placeholder { color: var(--text-light); }
@@ -687,19 +679,13 @@
       <div class="suggestions" id="suggestions">
 
         <button class="chip" onclick="submitSuggestion('What luxury projects does DarGlobal have in Dubai?')">
-          <div class="chip-icon gold">🏙️</div>
-          <div class="chip-text">
-            <strong>Explore Dubai developments</strong>
-            <span>Luxury towers, branded residences, waterfront projects</span>
-          </div>
+          <span class="chip-icon gold">🏙️</span>
+          <span class="chip-query">What luxury projects does DarGlobal have in Dubai?</span>
         </button>
 
         <button class="chip" onclick="submitSuggestion('What residential properties are available on Wasalt in Saudi Arabia?')">
-          <div class="chip-icon teal">🗺️</div>
-          <div class="chip-text">
-            <strong>Saudi Arabia listings</strong>
-            <span>Properties, auctions, and rentals via Wasalt</span>
-          </div>
+          <span class="chip-icon teal">🗺️</span>
+          <span class="chip-query">What residential properties are available on Wasalt in Saudi Arabia?</span>
         </button>
 
       </div>
