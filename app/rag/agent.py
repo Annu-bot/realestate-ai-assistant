@@ -67,12 +67,70 @@ _BOTH_KEYWORDS = {
 }
 
 _FREE_MODELS = [
-    "nvidia/nemotron-3.5-lightning:free",
     "baidu/ernie-5.5-flash-preview:free",
+    "nvidia/nemotron-3.5-lightning:free",
     "openrouter/free",
     "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
 ]
+
+
+def _clean_model_output(text: str) -> str:
+    """Filter out chain-of-thought, reasoning tags, and analysis artifacts."""
+    if not text:
+        return ""
+
+    # 1. Strip XML-style thinking/thought tags
+    cleaned = re.sub(r"<(?:think|thought|reasoning)>.*?</(?:think|thought|reasoning)>", "", text, flags=re.DOTALL | re.IGNORECASE)
+
+    # 2. If Draft: or Final Answer: section exists, extract only the final draft portion
+    if re.search(r"\b(?:draft|final response|final answer):\s*", cleaned, re.IGNORECASE):
+        parts = re.split(r"\b(?:draft|final response|final answer):\s*", cleaned, flags=re.IGNORECASE)
+        if len(parts) > 1 and len(parts[-1].strip()) > 20:
+            cleaned = parts[-1]
+
+    # 3. Cut off any trailing review / check sections (e.g., "Check line count:", "Review:")
+    cleaned = re.split(r"\n+(?:check line count|check constraints|constraints check|line count|review):\s*", cleaned, flags=re.IGNORECASE)[0]
+
+    # 4. If "Here's a thinking process" or similar still appears, filter out thought lines
+    if re.search(r"(?:thinking process|thought process|analyze user input):", cleaned, re.IGNORECASE):
+        lines = cleaned.splitlines()
+        filtered = []
+        in_thinking = True
+        for line in lines:
+            s = line.strip()
+            if in_thinking:
+                if any(s.lower().startswith(p) for p in [
+                    "here's", "1.", "2.", "3.", "4.", "check", "draft",
+                    "intro", "bullet", "user asks", "they want", "from the context",
+                    "structure:", "bullets:", "length:", "no markdown", "relevancy first"
+                ]):
+                    continue
+                if s.startswith(("•", "-", "*")) or (len(s) > 25 and not s.startswith("•User")):
+                    in_thinking = False
+            if not in_thinking:
+                filtered.append(line)
+        if filtered:
+            cleaned = "\n".join(filtered)
+
+    # 5. Remove any leftover check / line numbering lines (e.g., "Line 1: ...")
+    final_lines = []
+    for line in cleaned.splitlines():
+        s = line.strip()
+        if re.match(r"^line \d+:", s, re.IGNORECASE):
+            continue
+        final_lines.append(line)
+    cleaned = "\n".join(final_lines).strip()
+
+    # 6. Strip any trailing unfinished bullet fragment
+    lines = cleaned.splitlines()
+    if lines and lines[-1].strip().startswith(("-", "•", "*")):
+        last_line = lines[-1].strip()
+        if len(last_line) < 15 or not any(last_line.endswith(p) for p in [".", "!", "?", "”", ")"]):
+            lines.pop()
+            cleaned = "\n".join(lines).strip()
+
+    return cleaned.strip()
 
 
 def _get_api_keys() -> list[str]:
@@ -122,16 +180,11 @@ def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
                     max_tokens=800,
                 )
                 msg = response.choices[0].message
-                content = msg.content or getattr(msg, "reasoning", None) or getattr(msg, "text", None) or ""
+                content = msg.content or getattr(msg, "text", None) or ""
                 if content and content.strip():
-                    text = content.strip()
-                    lines = text.split("\n")
-                    if lines and lines[-1].strip().startswith(("-", "•", "*")):
-                        last_line = lines[-1].strip()
-                        if len(last_line) < 15 or not any(last_line.endswith(p) for p in [".", "!", "?", "”", ")"]):
-                            lines.pop()
-                            text = "\n".join(lines).strip()
-                    return text
+                    cleaned = _clean_model_output(content)
+                    if cleaned and len(cleaned) > 20:
+                        return cleaned
             except Exception as exc:
                 err_str = str(exc)
                 logger.warning("Key #%d model %s failed (%s).", key_idx + 1, model, exc)
