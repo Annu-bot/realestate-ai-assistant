@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Request, HTTPException, Header, BackgroundTasks
+from fastapi import APIRouter, Request, HTTPException, Header, BackgroundTasks, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -73,6 +73,12 @@ async def serve_index():
     if not index_path.exists():
         raise HTTPException(status_code=404, detail="index.html not found")
     return HTMLResponse(content=index_path.read_text(encoding="utf-8"))
+
+
+@router.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Handle browser favicon request cleanly without 404 logs."""
+    return Response(status_code=204)
 
 
 @router.post("/api/chat", response_model=ChatResponse, tags=["Chat"])

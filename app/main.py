@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("PropTechAgent init failed (%s).", exc)
 
-    logger.info("Startup complete. Serving on http://0.0.0.0:8000")
+    logger.info("Startup complete. Serving on http://localhost:8000")
     yield
 
     # Shutdown
