@@ -69,9 +69,8 @@ _BOTH_KEYWORDS = {
 _FREE_MODELS = [
     "baidu/ernie-5.5-flash-preview:free",
     "nvidia/nemotron-3.5-lightning:free",
-    "openrouter/free",
-    "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
+    "google/gemma-4-31b-it:free",
 ]
 
 
@@ -196,10 +195,16 @@ def _call_openrouter_llm(messages: list[dict], temperature: float = 0.3) -> str:
                     model=model,
                     messages=messages,
                     temperature=temperature,
-                    max_tokens=400,
+                    max_tokens=800,
                 )
                 msg = response.choices[0].message
                 content = msg.content or getattr(msg, "text", None) or ""
+                if not content and hasattr(msg, "reasoning") and msg.reasoning:
+                    # Extract final answer if model placed it after Draft: in reasoning
+                    match = re.search(r"\b(?:draft|final response|answer):\s*\n*(.*)", msg.reasoning, re.DOTALL | re.IGNORECASE)
+                    if match and len(match.group(1).strip()) > 20:
+                        content = match.group(1).strip()
+
                 if content and content.strip():
                     cleaned = _clean_model_output(content)
                     if cleaned and len(cleaned) > 20:
@@ -493,25 +498,35 @@ class PropTechAgent:
         return filtered[:2]
 
     def _synthesize_clean_fallback(self, query: str, intent: str, retrieved_docs: list[dict]) -> str:
-        """Dynamic extractive fallback that synthesizes directly from retrieved document chunks."""
+        """Dynamic extractive fallback: extracts clean prose from retrieved SQLite chunks without scraper headers."""
         if not retrieved_docs:
-            return "I currently do not have verified documentation for this specific query in the property knowledge base."
+            return "No verified property records were found for this query in the indexed catalog."
 
         bullets = []
         for doc in retrieved_docs[:3]:
             content = doc.get("chunk_text") or doc.get("content") or doc.get("text") or ""
+            # Extract only the actual body text (after === TEXT === if present)
+            if "=== TEXT ===" in content:
+                body = content.split("=== TEXT ===", 1)[1]
+            else:
+                body = content
+
+            # Strip any remaining scraper tags and clean whitespace
+            clean_body = re.sub(r"(?:URL:.*?|Title:.*?|Description:.*?|\[H\d\].*?|===.*?===)", "", body)
+            clean_body = re.sub(r"\s+", " ", clean_body).strip()
+
             sentences = [
-                s.strip() for s in re.split(r"(?<=[.!?])\s+", content)
-                if len(s.strip()) > 35 and not any(skip in s.lower() for skip in ["download", "cookie", "javascript", "privacy policy", "book unit", "all rights"])
+                s.strip() for s in re.split(r"(?<=[.!?])\s+", clean_body)
+                if len(s.strip()) > 35 and not any(skip in s.lower() for skip in ["download", "cookie", "javascript", "privacy", "book unit", "all rights", "http", "search", "barter"])
             ]
             if sentences:
-                title = doc.get("title", "").split("|")[0].split(" - ")[0].strip() or "Property Overview"
-                bullets.append(f"• **{title}:** {sentences[0]}")
+                clean_title = doc.get("title", "").split("|")[0].split(" - ")[0].strip() or doc.get("source", "Property Details").title()
+                bullets.append(f"• **{clean_title}:** {sentences[0]}")
 
         if bullets:
             return "Based on verified property documentation:\n\n" + "\n".join(bullets)
 
-        return "Verified property documentation is available in the indexed portfolio catalog."
+        return "Verified property documentation is available in the indexed catalog."
 
     def clear_history(self, session_id: str) -> None:
         try:
