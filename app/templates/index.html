@@ -144,11 +144,33 @@
       padding: 10px 10px;
       border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: background 0.12s;
-      margin-bottom: 1px;
+      transition: background 0.15s, border-color 0.15s;
+      margin-bottom: 2px;
+      border: 1px solid transparent;
     }
 
-    .history-item:hover { background: var(--sidebar-hover); }
+    .history-item:hover {
+      background: var(--sidebar-hover);
+      border-color: rgba(201, 168, 76, 0.25);
+    }
+
+    .history-item:hover .hist-q { color: #f3e5be; }
+    .history-item:hover .dot { background: #c9a84c; }
+
+    .history-item.active {
+      background: #231c12;
+      border-color: #5c4722;
+    }
+
+    .history-item.active .hist-q {
+      color: #f3e5be;
+      font-weight: 500;
+    }
+
+    .history-item.active .dot {
+      background: #c9a84c;
+      box-shadow: 0 0 6px #c9a84c;
+    }
 
     .history-item .dot {
       width: 5px;
@@ -787,11 +809,12 @@
   }
 
   /* ── Render messages ───────────────────────── */
-  function appendMessage(role, text, sources, suggestedQuestions) {
+  function appendMessage(role, text, sources, suggestedQuestions, msgId) {
     showMessages();
     const wrap = document.getElementById('messages-wrap');
     const row  = document.createElement('div');
     row.className = `msg-row ${role}`;
+    if (msgId) row.id = msgId;
 
     const bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
@@ -939,13 +962,9 @@
   }
 
   /* ── History sidebar ───────────────────────── */
-  function addToHistory(question) {
-    const item = { id: sessionId, question, time: new Date() };
-    allHistory.unshift(item);
-    renderHistory(allHistory);
-  }
+  let turnCounter = 0;
 
-  function renderHistory(list) {
+  function renderHistory(list, activeTurnId) {
     const el = document.getElementById('history-list');
     el.innerHTML = '';
     if (!list.length) {
@@ -954,14 +973,57 @@
     }
     list.forEach(item => {
       const div = document.createElement('div');
-      div.className = 'history-item';
+      div.className = 'history-item' + (item.id === activeTurnId ? ' active' : '');
+      div.dataset.turnId = item.id;
+      div.title = 'Click to jump to this question';
       div.innerHTML = `
         <div class="dot"></div>
         <div class="hist-text">
           <div class="hist-q">${item.question}</div>
           <div class="hist-time">${item.time.toLocaleDateString([], {month:'short',day:'numeric'})} · ${item.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
         </div>`;
+      div.onclick = () => openHistoryItem(item.id);
       el.appendChild(div);
+    });
+  }
+
+  function openHistoryItem(turnId) {
+    const item = allHistory.find(h => h.id === turnId);
+    if (!item) return;
+
+    // Check if element is currently rendered in the chat window
+    let userRow = document.getElementById(turnId + '-user');
+    let botRow  = document.getElementById(turnId + '-bot');
+
+    if (!userRow) {
+      // If user had cleared the screen or started new chat, restore this turn
+      showMessages();
+      userRow = appendMessage('user', item.question, null, null, turnId + '-user');
+      if (item.answer) {
+        botRow = appendMessage('bot', item.answer, item.sources, item.suggested, turnId + '-bot');
+      }
+    } else {
+      showMessages();
+    }
+
+    // Smooth scroll to the question
+    if (userRow) {
+      userRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const bubble = userRow.querySelector('.msg-bubble');
+      if (bubble) {
+        bubble.style.transition = 'box-shadow 0.25s, border-color 0.25s';
+        bubble.style.borderColor = '#c9a84c';
+        bubble.style.boxShadow = '0 0 16px rgba(201,168,76,0.45)';
+        setTimeout(() => {
+          bubble.style.borderColor = '';
+          bubble.style.boxShadow = '';
+        }, 1600);
+      }
+    }
+
+    // Set active class in sidebar
+    document.querySelectorAll('.history-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.turnId === turnId);
     });
   }
 
@@ -971,6 +1033,7 @@
     document.getElementById('messages-wrap').innerHTML = '';
     showWelcome();
     document.getElementById('user-input').value = '';
+    document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
   }
 
   function clearChat() {
@@ -978,6 +1041,7 @@
     showWelcome();
     fetch('/api/session/' + sessionId, { method: 'DELETE' }).catch(() => {});
     sessionId = crypto.randomUUID();
+    document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
   }
 
   /* ── Send message ──────────────────────────── */
@@ -991,8 +1055,20 @@
     input.value = '';
     input.style.height = 'auto';
 
-    appendMessage('user', text);
-    addToHistory(text);
+    const turnId = 'turn-' + (++turnCounter);
+    appendMessage('user', text, null, null, turnId + '-user');
+
+    const historyEntry = {
+      id: turnId,
+      question: text,
+      answer: null,
+      sources: [],
+      suggested: [],
+      time: new Date()
+    };
+    allHistory.unshift(historyEntry);
+    renderHistory(allHistory, turnId);
+
     showTyping();
 
     try {
@@ -1007,14 +1083,20 @@
       if (!res.ok) throw new Error('Server error ' + res.status);
 
       const data = await res.json();
-      const answer  = data.answer  || data.response || data.message || 'No response received.';
-      const sources = data.sources || [];
+      const answer    = data.answer || data.response || data.message || 'No response received.';
+      const sources   = data.sources || [];
       const suggested = data.suggested_questions || [];
-      appendMessage('bot', answer, sources, suggested);
+
+      appendMessage('bot', answer, sources, suggested, turnId + '-bot');
+
+      // Update history entry with full answer
+      historyEntry.answer = answer;
+      historyEntry.sources = sources;
+      historyEntry.suggested = suggested;
 
     } catch (err) {
       removeTyping();
-      appendMessage('bot', 'Something went wrong. Please try again.');
+      appendMessage('bot', 'Something went wrong. Please try again.', [], [], turnId + '-bot');
       console.error(err);
     }
 
