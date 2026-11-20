@@ -3,9 +3,6 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
-data/processed/vector_index/
-*.db
-*.sqlite
 .DS_Store
 venv/
 .venv/
