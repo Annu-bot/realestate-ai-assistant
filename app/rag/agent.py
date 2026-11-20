@@ -429,46 +429,68 @@ class PropTechAgent:
 
     def _generate_suggestions(self, query: str, intent: str) -> list[str]:
         q_lower = query.lower()
-        if any(w in q_lower for w in ["unit", "layout", "bedroom", "floor plan"]):
-            return [
+        suggestions = []
+
+        if any(w in q_lower for w in ["price", "payment", "plan", "cost", "install", "starting"]):
+            suggestions = [
+                "What are the expected completion timelines and handover dates for Dubai projects?",
+                "What branded residences does DarGlobal offer in collaboration with Pagani?"
+            ]
+        elif any(w in q_lower for w in ["unit", "layout", "bedroom", "floor plan"]):
+            suggestions = [
                 "What waterfront views and leisure amenities are offered at Urban Oasis?",
                 "What are the starting prices and flexible payment plans for Missoni residences?"
             ]
         elif any(w in q_lower for w in ["amenit", "facility", "pool", "view", "gym"]):
-            return [
+            suggestions = [
                 "Which Dubai developments feature infinity pools and direct canal access?",
                 "What designer brands are collaborating on DarGlobal interiors?"
             ]
         elif any(w in q_lower for w in ["trump", "hotel", "oman", "aida", "golf"]):
-            return [
+            suggestions = [
                 "What are the passive rental yields for Trump International Hotel rooms?",
                 "What community facilities surround the Trump Golf Club in Oman?"
             ]
         elif any(w in q_lower for w in ["auction", "infath", "enjaz"]):
-            return [
+            suggestions = [
                 "What deposit is required to participate in official Wasalt auctions?",
                 "Are commercial buildings and development plots included in upcoming auctions?"
             ]
         elif any(w in q_lower for w in ["difference", "compare", "comparison", "versus", "vs", "distinction"]) or (("darglobal" in q_lower or "dar global" in q_lower) and "wasalt" in q_lower) or intent == "both":
-            return [
+            suggestions = [
                 "What luxury off-plan developments does DarGlobal currently offer?",
                 "How can international buyers utilize Wasalt's Matchmaker service?"
             ]
         elif any(w in q_lower for w in ["dubai"]):
-            return [
+            suggestions = [
                 "What unit types and layouts are available in Urban Oasis by Missoni?",
-                "What are the starting prices and flexible payment plans for Dubai towers?"
+                "What branded residences does DarGlobal offer in collaboration with Pagani?"
             ]
         elif intent == "wasalt" or any(w in q_lower for w in ["saudi", "riyadh", "jeddah", "wasalt"]):
-            return [
+            suggestions = [
                 "What are the average villa rental prices in central Riyadh districts?",
                 "How can international buyers utilize Wasalt's Matchmaker service?"
             ]
         else:
-            return [
+            suggestions = [
                 "What luxury off-plan developments are currently open for booking?",
-                "What flexible installment payment structures are offered?"
+                "What designer brands are collaborating with DarGlobal on luxury residences?"
             ]
+
+        # Filter out any suggestion that repeats the user's current query
+        filtered = [s for s in suggestions if s.lower().strip("?") != q_lower.strip("?") and not (s.lower() in q_lower or q_lower in s.lower())]
+        defaults = [
+            "What branded residences does DarGlobal offer in collaboration with Pagani?",
+            "What real estate auction services are hosted on Wasalt in Saudi Arabia?",
+            "What are the expected completion timelines and handover dates for Dubai projects?"
+        ]
+        for d in defaults:
+            if len(filtered) >= 2:
+                break
+            if d.lower().strip("?") != q_lower.strip("?") and d not in filtered:
+                filtered.append(d)
+
+        return filtered[:2]
 
     def _synthesize_clean_fallback(self, query: str, intent: str, retrieved_docs: list[dict]) -> str:
         q_lower = query.lower()
