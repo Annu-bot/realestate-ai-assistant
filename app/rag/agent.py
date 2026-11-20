@@ -493,62 +493,25 @@ class PropTechAgent:
         return filtered[:2]
 
     def _synthesize_clean_fallback(self, query: str, intent: str, retrieved_docs: list[dict]) -> str:
-        q_lower = query.lower()
-        if any(w in q_lower for w in ["unit", "layout", "bedroom", "floor plan"]):
-            return (
-                "Urban Oasis by Missoni offers tailored luxury waterfront residences on the Dubai Canal:\n\n"
-                "• **Apartment Configurations:** Studios, 1, 2, and 3-bedroom luxury residences alongside exclusive 4-bedroom penthouses.\n"
-                "• **Open Layouts & Private Access:** Expansive open-plan living rooms with private elevator foyers for penthouses and panoramic canal glass.\n"
-                "• **Bespoke Missoni Design:** Custom interiors featuring MissoniHome color palettes, high-end Italian textiles, and private balconies."
-            )
-        elif any(w in q_lower for w in ["amenit", "facility", "pool", "view", "gym"]):
-            return (
-                "DarGlobal developments feature world-class hospitality and residential amenities:\n\n"
-                "• **Waterfront Leisure:** Infinity swimming pools overlooking the canal, landscaped aquatic decks, and private walkways.\n"
-                "• **Wellness & Fitness:** State-of-the-art gymnasium facilities, private spa suites, and resident wellness clubs.\n"
-                "• **Concierge & Hospitality:** 24/7 dedicated concierge services, valet parking, and smart building access control."
-            )
-        elif any(w in q_lower for w in ["trump", "hotel", "oman", "aida", "golf"]):
-            return (
-                "Trump International Hotel & Golf Villas in AIDA, Oman represent flagship luxury resort living:\n\n"
-                "• **Championship Golf Living:** 4, 5, and 6-bedroom clifftop villas integrated with an 18-hole Trump International Golf Club.\n"
-                "• **5-Star Trump Hotel:** High-end hospitality suites offering passive rental yields with two weeks of annual complimentary owner stays.\n"
-                "• **Coastal Elevation:** Perched 130 meters above sea level overlooking the Sea of Oman with private beaches."
-            )
-        elif any(w in q_lower for w in ["auction", "infath", "enjaz"]):
-            return (
-                "Wasalt hosts verified real estate auctions across Saudi Arabia in partnership with official entities:\n\n"
-                "• **Official Digital Auctions:** Real-time online bidding on court-mandated and institutional real estate via Infath and Enjaz.\n"
-                "• **Asset Diversity:** Commercial towers, development land parcels, and residential properties across Riyadh and Jeddah.\n"
-                "• **Transparent Verification:** Certified legal title deeds and transparent deposit and registration procedures."
-            )
-        elif any(w in q_lower for w in ["difference", "compare", "comparison", "versus", "vs", "distinction"]) or (("darglobal" in q_lower or "dar global" in q_lower) and "wasalt" in q_lower) or intent == "both":
-            return (
-                "DarGlobal and Wasalt serve distinct, complementary roles in real estate:\n\n"
-                "• **DarGlobal (Luxury Property Developer):** London-listed developer creating high-end branded residences (Missoni, Pagani, Trump, Aston Martin) across Dubai, Oman, Spain, and Qatar.\n"
-                "• **Wasalt (Digital Property Marketplace):** Saudi Arabia's leading property portal for browsing residential listings, rentals, and bidding on official Infath real estate auctions.\n"
-                "• **Strategic Focus:** DarGlobal builds and owns physical luxury developments, whereas Wasalt is a digital marketplace connecting buyers, renters, and brokers."
-            )
-        elif any(w in q_lower for w in ["dubai"]):
-            return (
-                "DarGlobal’s premier Dubai portfolio features landmark architectural developments:\n\n"
-                "• **Urban Oasis by Missoni (Business Bay):** Luxury canal-facing residences featuring custom Italian fashion interiors.\n"
-                "• **DG1 Living (Dubai Water Canal):** Distinctive architectural tower with panoramic canal and city skyline views.\n"
-                "• **DaVinci Tower by Pagani (Downtown Dubai):** Ultra-luxury bespoke residences designed in collaboration with Pagani Automobili."
-            )
-        elif "wasalt" in q_lower or intent == "wasalt" or any(w in q_lower for w in ["saudi", "riyadh", "jeddah"]):
-            return (
-                "Wasalt is Saudi Arabia's leading property platform providing comprehensive real estate services:\n\n"
-                "• **Verified Residential Listings:** Thousands of villas, townhouses, and modern apartments for rent and sale in Riyadh, Jeddah, and Dammam.\n"
-                "• **Interactive Neighborhood Insights:** District-level pricing, nearby schools, mosques, and transport infrastructure.\n"
-                "• **Matchmaker Service:** Intelligent search connecting verified prospective buyers with certified real estate brokers."
-            )
-        else:
-            return (
-                "Our real estate knowledge base covers international developments and regional marketplaces:\n\n"
-                "• **DarGlobal Luxury Portfolio:** Designer residences and golf communities across Dubai, Oman, and international waterfront destinations.\n"
-                "• **Wasalt Saudi Marketplace:** Verified residential villas, apartments, and official digital auctions across Saudi Arabia."
-            )
+        """Dynamic extractive fallback that synthesizes directly from retrieved document chunks."""
+        if not retrieved_docs:
+            return "I currently do not have verified documentation for this specific query in the property knowledge base."
+
+        bullets = []
+        for doc in retrieved_docs[:3]:
+            content = doc.get("chunk_text") or doc.get("content") or doc.get("text") or ""
+            sentences = [
+                s.strip() for s in re.split(r"(?<=[.!?])\s+", content)
+                if len(s.strip()) > 35 and not any(skip in s.lower() for skip in ["download", "cookie", "javascript", "privacy policy", "book unit", "all rights"])
+            ]
+            if sentences:
+                title = doc.get("title", "").split("|")[0].split(" - ")[0].strip() or "Property Overview"
+                bullets.append(f"• **{title}:** {sentences[0]}")
+
+        if bullets:
+            return "Based on verified property documentation:\n\n" + "\n".join(bullets)
+
+        return "Verified property documentation is available in the indexed portfolio catalog."
 
     def clear_history(self, session_id: str) -> None:
         try:
